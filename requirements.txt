@@ -7,3 +7,6 @@ torch
 torchvision
 tqdm
 scikit-learn
+matplotlib
+numpy
+pandas
