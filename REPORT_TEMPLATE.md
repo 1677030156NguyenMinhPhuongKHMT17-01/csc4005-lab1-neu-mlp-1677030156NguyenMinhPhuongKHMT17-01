@@ -1,39 +1,37 @@
 # CSC4005 – Lab 1 Report
 
 ## 1. Mục tiêu
-Mục tiêu của bài lab là tìm hiểu và xây dựng một pipeline huấn luyện hoàn chỉnh cho mạng nơ-ron (MLP) dựa trên bộ dữ liệu ảnh NEU Surface Defect Database (phân loại 6 lớp lỗi bề mặt thép: Crazing, Inclusion, Patches, Pitted_Surface, Rolled-in_Scale, Scratches). Thông qua việc thay đổi các siêu tham số (hyperparameters), em đánh giá được hiện tượng overfitting, underfitting, sự hiệu quả của các phương pháp regularization (như dropout) và sự khác biệt giữa các trình tối ưu hóa (AdamW vs SGD).
+Mục tiêu của bài lab là tìm hiểu và xây dựng một pipeline huấn luyện hoàn chỉnh cho mạng nơ-ron (MLP) dựa trên bộ dữ liệu ảnh NEU Surface Defect Database (phân loại 6 lớp lỗi: Crazing, Inclusion, Patches, Pitted_Surface, Rolled-in_Scale, Scratches). Thông qua việc điều chỉnh các siêu tham số (hyperparameters), em quan sát sự khác biệt giữa các cấu hình, đánh giá hiện tượng overfitting/underfitting, sự tác động của regularization và so sánh hiệu quả của các Optimizer (AdamW vs SGD).
 
 ## 2. Cấu hình thí nghiệm
-Các yếu tố cấu hình chung được giữ nguyên: Epoch = 20, Batch Size = 32, Image Size = 64, LF = 0.001, Weight Decay = 0.0001, Early Stopping Patience = 5, có sử dụng augment.  
-3 cấu hình cụ thể đã chạy để đối chiếu:
-1. **Cấu hình 1 (Baseline)**: Optimizer = **AdamW**, Dropout = **0.3**
-2. **Cấu hình 2 (Tăng Regularization)**: Optimizer = **AdamW**, Dropout = **0.5**
-3. **Cấu hình 3 (Đổi Optimizer)**: Optimizer = **SGD**, Dropout = **0.3**
+Các yếu tố cấu hình chung được giữ nguyên: Epoch = 20, Batch Size = 32, Image Size = 64, Early Stopping Patience = 5, có sử dụng data augmentation (--augment).  
+3 cấu hình cụ thể theo đúng chuẩn yêu cầu của Lab đã chạy trên **W&B**:
+1. **Run A (baseline_adamw)**: Optimizer = **AdamW**, LR = 0.001, Weight Decay = 0.0001, Dropout = **0.3**
+2. **Run B (run_b_sgd)**: Optimizer = **SGD**, LR = **0.01**, Weight Decay = **0.0**, Dropout = **0.3**
+3. **Run C (run_c_strong_reg)**: Optimizer = **AdamW**, LR = **0.0005**, Weight Decay = **0.001**, Dropout = **0.5**
 
 ## 3. Kết quả
-Bảng tổng hợp kết quả (đánh giá Validation cực đại):
+Bảng tổng hợp kết quả trích xuất từ dữ liệu log thực tế:
 
-| Run Name | Optimizer | Dropout | Best Val Loss | Best Val Acc | Test Acc |
-|----------|-----------|---------|---------------|--------------|----------|
-| `baseline_dropout_0.3` | AdamW | 0.3 | 1.499 | **41.85%** | **38.15%** |
-| `exper_dropout_0.5` | AdamW | 0.5 | 1.760 | 18.15% | 18.15% |
-| `exper_sgd_baseline` | SGD | 0.3 | 1.730 | 24.44% | 25.18% |
+| Run Name | Optimizer | LR | Weight Decay | Dropout | Best Val Loss | Best Val Acc | Test Acc |
+|----------|-----------|----|--------------|---------|---------------|--------------|----------|
+| aseline_adamw | AdamW | 0.001 | 0.0001 | 0.3 | 1.499 | 41.85% | 38.15% |
+| un_b_sgd | SGD | 0.01 | 0.0 | 0.3 | **1.443** | **48.89%** | **47.41%** |
+| un_c_strong_reg | AdamW | 0.0005 | 0.001 | 0.5 | 1.628 | 32.96% | 34.44% |
 
-*(Đồ thị Learning Curves chi tiết được đính kèm bằng hình ảnh `curves.png` trong từng thư mục thuộc `outputs/`)*
-
-*Nhận xét:*
-- Baseline (AdamW + Dropout 0.3) có kết quả Val Loss và Val Acc tốt nhất trong khoảng thời gian train nhỏ (20 epochs).
-- Khi đẩy Dropout lên quá cao (0.5), mô hình hoàn toàn mất khả năng học, độ chính xác Validation (18.15%) chỉ loanh quanh ở mức như việc đoán ngẫu nhiên 1 trong 6 lớp (khoảng 1/6 = 16.67%).
-- SGD hội tụ rất chậm so với AdamW, do đó khi dừng huấn luyện ở 20 epochs, Val Acc của SGD khá thấp so với Baseline.
+*Nhận xét từ biểu đồ learning curve:*
+- Lượt chạy **SGD (un_b_sgd)** đạt hiệu suất cao nhất. Với Learning Rate được chỉnh lên 0.01, tốc độ giảm loss và tăng độ chính xác vượt trội hơn hẳn so với AdamW baseline.
+- Lượt chạy **Baseline (aseline_adamw)** học khá nhanh ở những epoch rọi nhưng bắt đầu dao động lớn về độ chính xác xác cũng như loss.
+- Lượt chạy **Strong Regularization (un_c_strong_reg)** (đường curve cao nhất ở loss) do bị kìm kẹp bởi Dropout cao (0.5), Weight Decay lớn (0.001) và LR thấp (0.0005) nên tiến trình học bị chậm đi rõ rệt, kết quả accuracy xếp chót trong 3 cấu hình sau 20 epoch.
 
 ## 4. Phân tích
 - **Cấu hình nào tốt nhất?** 
-  Cấu hình `baseline_dropout_0.3` hoạt động tốt nhất.
+  Cấu hình **un_b_sgd** là cấu hình làm việc tốt nhất trên tập Validation và cả tập Test thực tế.
 - **Dấu hiệu overfitting / underfitting là gì?** 
-  - *Underfitting:* Ở Cấu hình 2 (Dropout 0.5), ta thấy train_acc và val_acc đều rất thấp (18.15%), không tăng được. Mô hình đang bị underfitting do bị "phạt" quá nặng, dẫn tới việc không học nổi tính chất nào cả. Tương tự, SGD (Cấu hình 3) cũng bị underfitting ở giai đoạn đầu do tốc độ học quá chậm.
+  - *Underfitting:* Mô hình un_c_strong_reg đang có dấu hiệu underfitting (tốc độ hội tụ quá chậm). Việc kết hợp giữa giảm tốc độ học (LR nhỏ) cộng với việc tăng hình phạt quá khắc nghiệt (Dropout = 0.5, Weight Decay gấp 10 lần) làm mô hình MLP bị thu hẹp đáng kể khả năng tối ưu hóa trọng số. Mất 20 epoch nhưng val_loss vẫn chỉ xuống được ~1.62 và kết quả độ chính xác chỉ nhích lên được tầm hơn 30%.
 - **AdamW và SGD khác nhau ra sao trong thí nghiệm của bạn?**
-  Với cùng mức Learning Rate (0.001) và số Epochs ngắn, AdamW thể hiện sức mạnh tối ưu cực kỳ nhanh, giúp độ chính xác vọt lên ngay ở những epoch đầu nhờ điều chỉnh tốc độ học tự động cho các tham số khác nhau. Trong khi đó, thuật toán lấy mẫu ngẫu nhiên SGD với tốc độ học cố định rơi vào tình trạng tiến triển rất chậm chạp. Nó cần số Epochs lớn hơn, hoặc Learning rate lớn hơn nhiều và thay đổi theo lịch trình (scheduler) thì mới bắt kịp AdamW.
+  Mặc dù AdamW nổi tiếng là hội tụ cực nhanh (như ở aseline), nhưng trong bài toán cụ thể này nếu chọn đúng hệ số học phù hợp (LR=0.01 cho SGD), thì mô hình sử dụng thuật toán kinh điển **SGD** lại vươn lên dẫn đầu. SGD không có thành phần momentum nội tại cực tinh vi như AdamW nhưng bù lại với learning rate lớn, bộ trọng số tránh được những hố nông và đạt được độ chính xác val/test xuất sắc (48.89%).
 
 ## 5. Kết luận
-- **Best Config:** Lựa chọn `baseline_dropout_0.3` (AdamW, Dropout: 0.3).
-- **Lý do:** Mô hình này cho Validation Acc cao nhất (41.85%) và Test Acc cao nhất (38.15%). Việc dùng kết hợp giữa AdamW và Dropout ở mức vừa phải (0.3) giúp mạng học được các features một cách nhanh chóng mà không bị cản trở quá lớn. (Do các thí nghiệm trên mới dùng kiến trúc MLP đơn giản và Img_size 64 bé, nên độ chính xác tối đa chưa cao, nhưng nó là cấu hình tối ưu nhất để chứng minh mô hình học sâu có khả năng hội tụ nhanh).
+- **Best Config:** Lựa chọn un_b_sgd (Optimizer: SGD, LR: 0.01, Weight Decay: 0.0, Dropout: 0.3).
+- **Lý do:** Đây là mô hình đạt **Validation Accuracy** cực đại cao nhất (48.89%), và **Test Accuracy** cao nhất (47.41%). SGD kết hợp với LR=0.01 đã cung cấp bước tính toán độ dốc phù hợp nhất trên không gian tập dữ liệu ảnh bị nhiễu hạt này. Khả năng dự đoán trên Confusion Matrix của mô hình tốt hơn rệt, ít bị thiên lệch tập trung vào một lớp so với các model còn lại.
